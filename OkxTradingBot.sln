@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35312.102
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OkxTradingBot.Core", "OkxTradingBot.Core\OkxTradingBot.Core.csproj", "{7D8B3CA8-81A8-4856-9056-9D5330C899C3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OkxTradingBot.UI", "OkxTradingBot.UI\OkxTradingBot.UI.csproj", "{F384CCFB-B158-4D2A-A0F2-2CEFDA8320F6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7D8B3CA8-81A8-4856-9056-9D5330C899C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7D8B3CA8-81A8-4856-9056-9D5330C899C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7D8B3CA8-81A8-4856-9056-9D5330C899C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7D8B3CA8-81A8-4856-9056-9D5330C899C3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F384CCFB-B158-4D2A-A0F2-2CEFDA8320F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F384CCFB-B158-4D2A-A0F2-2CEFDA8320F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F384CCFB-B158-4D2A-A0F2-2CEFDA8320F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F384CCFB-B158-4D2A-A0F2-2CEFDA8320F6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F0A836B8-2926-472B-9091-6A195A7F0E44}
+	EndGlobalSection
+EndGlobal
