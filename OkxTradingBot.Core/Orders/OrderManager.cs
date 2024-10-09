@@ -19,8 +19,8 @@ namespace OkxTradingBot.Core.Orders
 
         public async Task PlaceOrderAsync(string symbol, decimal amount)
         {
-            bool result = await _apiClient.PlaceBuyOrderAsync(symbol, amount);
-            if (result)
+            string result = await _apiClient.PlaceBuyOrderAsync(symbol, amount);
+            if (result!= null)
             {
                 Console.WriteLine("Order placed successfully.");
             }
