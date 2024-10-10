@@ -30,4 +30,15 @@ namespace OkxTradingBot.Core.Orders
             }
         }
     }
+
+    public class Order
+    {
+        public string OrderId { get; set; }
+        public string Symbol { get; set; }
+        public string Side { get; set; } // 买单或卖单
+        public string Status { get; set; }
+        public decimal Amount { get; set; }
+        public decimal Price { get; set; }
+        public DateTime OrderTime { get; set; }  // 新增时间列
+    }
 }

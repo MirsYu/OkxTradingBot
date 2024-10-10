@@ -30,6 +30,23 @@ namespace OkxTradingBot.Core.Api
         }
 
         /// <summary>
+        /// 获取所有交易对
+        /// </summary>
+        /// <returns></returns>
+        public async Task<List<string>> GetAllSymbolsAsync()
+        {
+            var markets = await _Api.LoadMarkets();
+            List<string> symbols = new List<string>();
+
+            foreach (var market in markets)
+            {
+                symbols.Add(market.Value.symbol);
+            }
+
+            return symbols;
+        }
+
+        /// <summary>
         /// 获取指定交易对的当前价格
         /// </summary>
         /// <param name="symbol">交易对符号，如 "BTC/USDT"</param>
