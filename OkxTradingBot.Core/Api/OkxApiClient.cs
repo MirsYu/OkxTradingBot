@@ -1,9 +1,12 @@
 ﻿using ccxt;
 using OkxTradingBot.Core.Config;
+using OkxTradingBot.Core.Strategies;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace OkxTradingBot.Core.Api
@@ -14,6 +17,9 @@ namespace OkxTradingBot.Core.Api
     public class OkxApiClient
     {
         private readonly okx _Api;
+        private static SemaphoreSlim _semaphore = new SemaphoreSlim(10, 10); // 同时允许最多10个请求
+        private static readonly TimeSpan RateLimitPeriod = TimeSpan.FromSeconds(2); // 每2秒
+        private static DateTime _lastRequestTime = DateTime.MinValue;
 
         public OkxApiClient()
         {
@@ -29,12 +35,36 @@ namespace OkxTradingBot.Core.Api
             _Api.setSandboxMode(true); // 启用沙箱模式，用于测试交易
         }
 
+        // 请求速率限制器
+        private async Task RateLimitAsync()
+        {
+            await _semaphore.WaitAsync();
+
+            try
+            {
+                var now = DateTime.UtcNow;
+                var timeSinceLastRequest = now - _lastRequestTime;
+
+                if (timeSinceLastRequest < RateLimitPeriod)
+                {
+                    await Task.Delay(RateLimitPeriod - timeSinceLastRequest); // 等待剩余时间
+                }
+
+                _lastRequestTime = DateTime.UtcNow; // 更新最后一次请求时间
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
         /// <summary>
         /// 获取所有交易对
         /// </summary>
         /// <returns></returns>
         public async Task<List<string>> GetAllSymbolsAsync()
         {
+            await RateLimitAsync(); // 调用速率限制
             var markets = await _Api.LoadMarkets();
             List<string> symbols = new List<string>();
 
@@ -53,6 +83,7 @@ namespace OkxTradingBot.Core.Api
         /// <returns>返回交易对的最新价格</returns>
         public async Task<decimal> GetPriceAsync(string symbol)
         {
+            await RateLimitAsync(); // 调用速率限制
             var ticker = await _Api.FetchTicker(symbol);
             return (decimal)(ticker.last != null ? ticker.last : 0);
         }
@@ -65,6 +96,7 @@ namespace OkxTradingBot.Core.Api
         /// <returns>返回是否成功下单</returns>
         public async Task<string> PlaceBuyOrderAsync(string symbol, decimal amount)
         {
+            await RateLimitAsync(); // 调用速率限制
             var order = await _Api.CreateMarketBuyOrder(symbol, (double)amount);
             return order.id;
         }
@@ -76,6 +108,7 @@ namespace OkxTradingBot.Core.Api
         /// <returns>返回账户中该货币的余额</returns>
         public async Task<decimal> GetBalanceAsync(string currency)
         {
+            await RateLimitAsync(); // 调用速率限制
             var balance = await _Api.FetchBalance();
             return balance[currency].free != null ? (decimal)balance[currency].free : 0;
         }
@@ -106,6 +139,7 @@ namespace OkxTradingBot.Core.Api
         /// <returns>返回是否成功下单</returns>
         public async Task<string> PlaceSellOrderAsync(string symbol, decimal amount)
         {
+            await RateLimitAsync(); // 调用速率限制
             var order = await _Api.CreateMarketSellOrder(symbol, (double)amount);
             return order.id;
         }
@@ -118,6 +152,7 @@ namespace OkxTradingBot.Core.Api
         /// <returns>返回订单状态</returns>
         public async Task<string> GetOrderStatusAsync(string symbol, string orderId)
         {
+            await RateLimitAsync(); // 调用速率限制
             // 通过订单ID获取订单详情
             var order = await _Api.FetchOrder(orderId, symbol);
 
@@ -129,25 +164,65 @@ namespace OkxTradingBot.Core.Api
         /// 获取指定交易对和时间间隔的OHLCV数据
         /// </summary>
         /// <param name="subscriptions">交易对及其时间间隔列表</param>
-        public async Task WatchOHLCVForSymbols(List<List<string>> subscriptions)
+        public async Task<List<Candle>> FetchOHLCVData(string symbol, string timeframe)
         {
-            while (true)
+            var candles = new List<Candle>(); // 用于存储蜡烛图数据
+            try
             {
-                try
+                // 定义所需的蜡烛数量
+                int requiredCandles = 50; // 至少需要26根K线
+                TimeSpan candleTimeSpan;
+
+                // 根据时间间隔设置时间跨度（这里假设时间间隔为 "15m"）
+                switch (timeframe)
                 {
-                    // 使用ccxt.pro获取OHLCV实时数据
-                    var ohlcv = await _Api.WatchOHLCVForSymbols(subscriptions);
-                    foreach (var ohlcvData in ohlcv)
+                    case "15m":
+                        candleTimeSpan = TimeSpan.FromMinutes(15);
+                        break;
+                    case "1h":
+                        candleTimeSpan = TimeSpan.FromHours(1);
+                        break;
+                    // 可以添加其他时间间隔
+                    default:
+                        throw new ArgumentException("不支持的时间间隔");
+                }
+
+                // 计算获取数据的开始时间
+                long since = DateTimeOffset.UtcNow.Add(-candleTimeSpan * requiredCandles).ToUnixTimeMilliseconds();
+
+                // 获取历史 OHLCV 数据
+                var limit = requiredCandles; // 设置获取的K线数量为所需数量
+                await RateLimitAsync(); // 调用速率限制
+                var ohlcv = await _Api.fetchOHLCV(symbol, timeframe, since, limit);
+
+                if (ohlcv is List<object> ohlcvList)
+                {
+                    foreach (var ohlcvRow in ohlcvList)
                     {
-                        Console.WriteLine($"交易对: {ohlcvData.Key}, 数据: {ohlcvData.Value}");
+                        if (ohlcvRow is List<object> row && row.Count >= 6)
+                        {
+                            var candle = new Candle
+                            {
+                                Time = DateTimeOffset.FromUnixTimeMilliseconds(Convert.ToInt64(row[0])).UtcDateTime.ToLocalTime(),
+                                Open = Convert.ToDecimal(row[1]),
+                                High = Convert.ToDecimal(row[2]),
+                                Low = Convert.ToDecimal(row[3]),
+                                Close = Convert.ToDecimal(row[4])
+                            };
+                            candles.Add(candle); // 将蜡烛图数据添加到列表中
+                        }
                     }
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"获取OHLCV数据时发生错误: {ex.Message}");
-                }
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"获取OHLCV数据时发生错误: {ex.Message}");
+            }
+
+            return candles; // 返回蜡烛图数据
         }
+
+
 
         public class MACDResult
         {
@@ -174,37 +249,39 @@ namespace OkxTradingBot.Core.Api
 
         public List<MACDResult> CalculateMACD(List<decimal> prices, int fastPeriod = 12, int slowPeriod = 26, int signalPeriod = 9)
         {
+            // 检查价格数量是否足够
+            if (prices.Count < slowPeriod + signalPeriod)
+            {
+                throw new InvalidOperationException("价格数据不足，无法计算MACD。");
+            }
+
             List<MACDResult> macdResults = new List<MACDResult>();
 
             // 计算快速和慢速 EMA
             var fastEMA = CalculateEMA(prices, fastPeriod);
             var slowEMA = CalculateEMA(prices, slowPeriod);
 
-            // 计算MACD线
+            // 确保两者长度一致，取较小的长度
+            int macdLength = Math.Min(fastEMA.Count, slowEMA.Count);
+
+            // 计算 MACD 线
             List<decimal> macdLine = new List<decimal>();
-            for (int i = 0; i < prices.Count; i++)
+            for (int i = 0; i < macdLength; i++)
             {
-                if (i >= slowPeriod - 1) // 确保有足够的数据来计算慢速EMA
-                {
-                    macdLine.Add(fastEMA[i] - slowEMA[i]);
-                }
-                else
-                {
-                    macdLine.Add(0); // 尚未有足够数据计算
-                }
+                macdLine.Add(fastEMA[i + (fastEMA.Count - macdLength)] - slowEMA[i + (slowEMA.Count - macdLength)]);
             }
 
             // 计算信号线
             var signalLine = CalculateEMA(macdLine, signalPeriod);
 
             // 计算柱状图
-            for (int i = 0; i < prices.Count; i++)
+            for (int i = 0; i < macdLine.Count; i++)
             {
                 var macdResult = new MACDResult
                 {
                     MACDLine = macdLine[i],
-                    SignalLine = signalLine[i],
-                    Histogram = macdLine[i] - signalLine[i]
+                    SignalLine = (i < signalLine.Count) ? signalLine[i] : 0, // 如果信号线不足，默认0
+                    Histogram = macdLine[i] - (i < signalLine.Count ? signalLine[i] : 0) // 如果信号线不足，默认0
                 };
                 macdResults.Add(macdResult);
             }
@@ -212,14 +289,23 @@ namespace OkxTradingBot.Core.Api
             return macdResults;
         }
 
+
+
         private List<decimal> CalculateEMA(List<decimal> prices, int period)
         {
             List<decimal> ema = new List<decimal>();
             decimal multiplier = 2m / (period + 1);
 
+            // 处理不足以计算 EMA 的情况
+            if (prices.Count < period)
+            {
+                // 如果价格数据不足以计算 EMA，返回空列表
+                return ema;
+            }
+
             // 初始的EMA使用简单移动平均计算
             decimal sma = prices.Take(period).Average();
-            ema.Add(sma);
+            ema.Add(sma); // 将初始的 SMA 添加到 EMA 列表中
 
             // 后续的EMA根据公式计算
             for (int i = period; i < prices.Count; i++)
@@ -230,6 +316,7 @@ namespace OkxTradingBot.Core.Api
 
             return ema;
         }
+
 
         /// <summary>
         /// 

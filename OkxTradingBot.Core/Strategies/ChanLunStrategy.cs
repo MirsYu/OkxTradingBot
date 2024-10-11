@@ -1,7 +1,9 @@
-﻿using System;
+﻿using OkxTradingBot.Core.Api;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace OkxTradingBot.Core.Strategies
 {
@@ -108,6 +110,30 @@ namespace OkxTradingBot.Core.Strategies
             }
             return "Hold"; // 无操作信号
         }
+
+        public static async Task<IEnumerable<CandidateSymbolData>> AnalyzeSymbolsAsync(IEnumerable<CryptoHotData> symbols)
+        {
+            var result = symbols.Select(symbol =>
+            {
+
+                bool isValid1 = decimal.TryParse(symbol.Change.TrimEnd('%'), out decimal changePercent);
+                bool isValid2 = decimal.TryParse(symbol.Volume.Split(' ')[0].Replace(",", ""), out decimal volume); // 去掉千分符
+                bool isValid = isValid1 && isValid2;
+
+                // 根据条件判断
+                bool meetsCriteria = isValid && changePercent > 2 && volume > 500;
+
+                return new CandidateSymbolData
+                {
+                    Symbol = symbol.Symbol,
+                    Change = symbol.Change,
+                    Volume = symbol.TradingVolume24h,
+                    MeetsCriteria = meetsCriteria // 可以添加一个字段来指示是否满足条件
+                };
+            });
+
+            return result;
+        }
     }
 
     public class Candle
@@ -118,4 +144,14 @@ namespace OkxTradingBot.Core.Strategies
         public decimal Close { get; set; }
         public DateTime Time { get; set; }
     }
+
+    public class CandidateSymbolData
+    {
+        public string Symbol { get; set; }
+        public string Change { get; set; }
+        public string Volume { get; set; }
+
+        public bool MeetsCriteria { get; set; }
+    }
+
 }

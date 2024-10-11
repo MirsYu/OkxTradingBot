@@ -7,6 +7,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Threading;
 
@@ -17,12 +18,74 @@ namespace OkxTradingBot.UI.ViewModel
         private OkxApiClient _apiClient;
         private DispatcherTimer _priceTimer;
 
+        private bool _isExecuting = false; // 标志位
+
+        private const int MaxLogLines = 100;
+
         // 绑定的交易对集合
         public ObservableCollection<string> Symbols { get; set; }
 
         public ObservableCollection<Core.Orders.Order> Orders { get; set; } = new ObservableCollection<Core.Orders.Order>();
 
-        public ObservableCollection<string> CandidateSymbols { get; set; }
+        public ObservableCollection<CryptoHotData> HotSymbols { get; set; } = new ObservableCollection<CryptoHotData>();
+        public ObservableCollection<CryptoGainersLosersData> GainersSymbols { get; set; } = new ObservableCollection<CryptoGainersLosersData>();
+        public ObservableCollection<CryptoLosersGainersData> LosersSymbols { get; set; } = new ObservableCollection<CryptoLosersGainersData>();
+        public ObservableCollection<CryptoNewData> NewSymbols { get; set; } = new ObservableCollection<CryptoNewData>();
+        public ObservableCollection<TrendingCrypto> TrendingSymbols { get; set; } = new ObservableCollection<TrendingCrypto>();
+        public ObservableCollection<CryptoMarketCap> MarketCapSymbols { get; set; } = new ObservableCollection<CryptoMarketCap>();
+        public ObservableCollection<CryptoVolumeData> VolumeSymbols { get; set; } = new ObservableCollection<CryptoVolumeData>();
+
+        private string _tradeSignal;
+        public string TradeSignal
+        {
+            get => _tradeSignal;
+            set
+            {
+                _tradeSignal = value;
+                OnPropertyChanged(nameof(TradeSignal));
+                // 在设置信号后触发事件
+                OnTradeSignalChanged();
+            }
+        }
+
+        // 用于处理交易信号变化的事件
+        public event EventHandler<string> TradeSignalChanged;
+
+        // 触发交易信号变化事件
+        private void OnTradeSignalChanged()
+        {
+            TradeSignalChanged?.Invoke(this, TradeSignal);
+        }
+
+        private ObservableCollection<string> _logEntries;
+
+        public ObservableCollection<string> LogEntries
+        {
+            get => _logEntries;
+            set
+            {
+                _logEntries = value;
+                OnPropertyChanged(nameof(LogEntries));
+            }
+        }
+
+
+
+        // 新增一个方法来更新日志
+        private void UpdateLog(string message)
+        {
+            string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {message}";
+
+            // 添加新日志项
+            LogEntries.Add(logEntry);
+
+            // 保持最多 100 行
+            if (LogEntries.Count > MaxLogLines)
+            {
+                LogEntries.RemoveAt(0); // 删除最早的行
+            }
+        }
+
 
         private string _selectedSymbol;
         public string SelectedSymbol
@@ -61,36 +124,154 @@ namespace OkxTradingBot.UI.ViewModel
             ExportCommand = new RelayCommand(ExportToExcel);
             fetcher = new CryptoDataFetcher();
             Symbols = new ObservableCollection<string>();
+            LogEntries = new ObservableCollection<string>();
+
+            LoadSymbols();
 
             // 初始化定时器
             _priceTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromSeconds(30) // 每隔 30 秒获取一次价格
             };
-            _priceTimer.Tick += (s, e) => FetchPriceAsync();
+            _priceTimer.Tick += async (s, e) =>
+            {
+                if (!_isExecuting) // 只有在没有执行时才开始新的任务
+                {
+                    _isExecuting = true;
+                    await LoadCandidateSymbols(); // 加载候选币种
+                    _isExecuting = false;
+                }
+            };
             _priceTimer.Start();
-
-            LoadSymbols();
-
-            CandidateSymbols = new ObservableCollection<string>();
-            LoadCandidateSymbols();
         }
 
-        private async void LoadCandidateSymbols()
+
+        private async Task LoadCandidateSymbols()
         {
-            // 获取数据并根据 ChanLunStrategy 进行筛选
-            var fetcher = new CryptoDataFetcher();
-            var allSymbols = await fetcher.FetchAllSymbolsAsync(); // 获取所有币种
+            var hotCryptos = await fetcher.FetchHotCryptoDataAsync();
+            var gainersLosers = await fetcher.FetchGainersLosersDataAsync();
+            var losersGainers = await fetcher.FetchLosersGainersDataAsync();
+            var newCrypto = await fetcher.FetchNewCryptoDataAsync();
+            var trendingCrypto = await fetcher.FetchTrendingCryptoDataAsync();
+            var cryptoMarketCap = await fetcher.FetchCryptoMarketCapDataAsync();
+            var cryptoVolume = await fetcher.FetchCryptoVolumeDataAsync();
 
-            // 假设有一个方法来筛选和排序
-            var filteredSymbols = await ChanLunStrategy.AnalyzeSymbolsAsync(allSymbols);
-
-            // 清空当前候选币种并添加新的
-            CandidateSymbols.Clear();
-            foreach (var symbol in filteredSymbols)
+            // 清空并添加新的数据
+            HotSymbols.Clear();
+            foreach (var crypto in hotCryptos)
             {
-                CandidateSymbols.Add(symbol);
+                HotSymbols.Add(crypto);
             }
+
+            GainersSymbols.Clear();
+            foreach (var gainer in gainersLosers)
+            {
+                GainersSymbols.Add(gainer);
+            }
+
+            LosersSymbols.Clear();
+            foreach (var loser in losersGainers)
+            {
+                LosersSymbols.Add(loser);
+            }
+
+            NewSymbols.Clear();
+            foreach (var newC in newCrypto)
+            {
+                NewSymbols.Add(newC);
+            }
+
+            TrendingSymbols.Clear();
+            foreach (var trend in trendingCrypto)
+            {
+                TrendingSymbols.Add(trend);
+            }
+
+            MarketCapSymbols.Clear();
+            foreach (var marketCap in cryptoMarketCap)
+            {
+                MarketCapSymbols.Add(marketCap);
+            }
+
+            VolumeSymbols.Clear();
+            foreach (var volume in cryptoVolume)
+            {
+                VolumeSymbols.Add(volume);
+            }
+
+            // 在数据加载完毕后，开始监控所有符号
+            await MonitorOHLCVForAllSymbols("15m");
+        }
+
+        public async Task MonitorOHLCVForAllSymbols(string interval)
+        {
+            // 遍历热门币种列表
+            foreach (var symbolData in HotSymbols)
+            {
+                await MonitorOHLCVData(symbolData.Symbol, interval);
+            }
+
+            // 遍历涨幅榜列表
+            foreach (var symbolData in GainersSymbols)
+            {
+                await MonitorOHLCVData(symbolData.Symbol, interval);
+            }
+
+            // 遍历跌幅榜列表
+            foreach (var symbolData in LosersSymbols)
+            {
+                await MonitorOHLCVData(symbolData.Symbol, interval);
+            }
+
+            // 遍历新币种列表
+            foreach (var symbolData in NewSymbols)
+            {
+                await MonitorOHLCVData(symbolData.Symbol, interval);
+            }
+
+            // 遍历市场市值列表
+            foreach (var symbolData in MarketCapSymbols)
+            {
+                await MonitorOHLCVData(symbolData.Symbol, interval);
+            }
+
+            // 遍历24小时交易量列表
+            foreach (var symbolData in VolumeSymbols)
+            {
+                await MonitorOHLCVData(symbolData.Symbol, interval);
+            }
+
+            // 遍历趋势币种列表
+            foreach (var symbolData in TrendingSymbols)
+            {
+                await MonitorOHLCVData(symbolData.Symbol, interval);
+            }
+        }
+
+        // 在 MonitorOHLCVData 方法中
+        public async Task MonitorOHLCVData(string symbol, string interval)
+        {
+            var candles = await _apiClient.FetchOHLCVData(symbol, interval);
+
+            if (candles.Count < 26)
+            {
+                Debug.WriteLine("蜡烛数据不足，无法计算MACD。");
+                return;
+            }
+
+            var closingPrices = candles.Select(c => c.Close).ToList();
+            var strategy = new ChanLunStrategy();
+            var macdResults = _apiClient.CalculateMACD(closingPrices);
+            var lastMacdResult = macdResults.Last();
+            var previousMacdResult = macdResults[^2];
+
+            string signal = strategy.GenerateSignal(candles, new List<decimal> { lastMacdResult.MACDLine, previousMacdResult.MACDLine });
+
+            // 设置 TradeSignal 属性
+            TradeSignal = $"{symbol}：生成的交易信号: {signal}";
+
+            // 更新日志
+            UpdateLog(TradeSignal);
         }
 
         // 加载交易对的方法
@@ -126,7 +307,7 @@ namespace OkxTradingBot.UI.ViewModel
         {
             // 仅选择 "OKB" 或 "USDT" 为 QUOTE 的交易对
             return !symbol.Contains(":") && !symbol.Contains("-") && !symbol.Contains(".")
-                   && (symbol.EndsWith("/OKB") || symbol.EndsWith("/USDT"));
+                   && /*(symbol.EndsWith("/OKB") ||*/ symbol.EndsWith("/USDT");
         }
 
 
@@ -222,20 +403,6 @@ namespace OkxTradingBot.UI.ViewModel
             {
                 Debug.WriteLine($"交易过程中出现错误: {ex.Message}");
             }
-        }
-
-        public async Task MonitorOHLCVData()
-        {
-            // 订阅交易对和时间间隔，例如：BTC/USDT 5分钟 和 ETH/USDT 5分钟
-            var subscriptions = new List<List<string>>()
-            {
-                new List<string> { "BTC/USDT", "5m" },
-                new List<string> { "ETH/USDT", "5m" },
-                new List<string> { "BTC/USDT", "1h" }
-            };
-
-            // 开始监听OHLCV数据
-            await _apiClient.WatchOHLCVForSymbols(subscriptions);
         }
 
         private void ExportToExcel()

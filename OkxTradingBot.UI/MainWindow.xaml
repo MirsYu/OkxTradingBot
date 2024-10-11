@@ -6,33 +6,36 @@
         mc:Ignorable="d"
         Title="OKX Trading Bot" Height="1000" Width="1200">
     <Grid>
-        <!-- 上方的市场数据部分 -->
+        <!-- 定义行 -->
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <!-- 上方控制部分 -->
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <!-- 主内容部分 -->
+            <RowDefinition Height="200"/>
+            <!-- 下方日志部分 -->
         </Grid.RowDefinitions>
-
-        <!-- 创建两列布局 -->
+        <!-- 定义列 -->
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="2*" />
-            <!-- 左侧候选列表较窄 -->
-            <ColumnDefinition Width="5*" />
-            <!-- 右侧订单追踪较宽 -->
+            <ColumnDefinition Width="3*"/>
+            <!-- 左侧 -->
+            <ColumnDefinition Width="4*"/>
+            <!-- 右侧 -->
         </Grid.ColumnDefinitions>
 
+        <!-- 上方控制部分 -->
         <StackPanel Orientation="Horizontal" Margin="10" Grid.Row="0" Grid.ColumnSpan="2">
             <!-- 交易对输入 -->
             <TextBlock Text="交易对:" VerticalAlignment="Center" Margin="0,0,5,0"/>
             <ComboBox x:Name="symbolComboBox" Width="120" Margin="0,0,10,0"
-                  ItemsSource="{Binding Symbols}" 
-                  SelectedItem="{Binding SelectedSymbol}" 
-                  SelectedIndex="0"/>
+                      ItemsSource="{Binding Symbols}" 
+                      SelectedItem="{Binding SelectedSymbol}" 
+                      SelectedIndex="0"/>
 
             <!-- 价格展示 -->
             <TextBlock Text="当前价格:" VerticalAlignment="Center" Margin="0,0,5,0"/>
             <TextBlock x:Name="priceTextBlock" Width="100" VerticalAlignment="Center"
-                   Text="{Binding CurrentPrice, StringFormat={}{0:F2}}" />
+                       Text="{Binding CurrentPrice, StringFormat={}{0:F2}}" />
 
             <!-- 下单数量 -->
             <TextBlock Text="数量:" VerticalAlignment="Center" Margin="10,0,5,0"/>
@@ -41,36 +44,150 @@
             <!-- 下单按钮 -->
             <Button Content="下单" Width="80" Margin="10,0,0,0" Command="{Binding StartTradingCommand}" />
 
-            <!-- 测试按钮 -->
+            <!-- 发送截图到微信按钮 -->
             <Button Content="发送截图到微信" Click="SendScreenshotButton_Click" Width="120" Margin="10,0,0,0" />
 
-            <!-- 发送字符按钮 -->
+            <!-- 发送字符到微信按钮 -->
             <Button Content="发送字符到微信" Click="SendCharacterButton_Click" Width="120" Margin="10,0,0,0" />
         </StackPanel>
 
-        <!-- 左侧候选币种列表 -->
-        <GroupBox Header="候选币种" Margin="10" Grid.Row="1" Grid.Column="0">
-            <ListBox x:Name="candidateSymbolsListBox" ItemsSource="{Binding CandidateSymbols}" />
+        <!-- 左侧币种选择部分，改为TabControl -->
+        <GroupBox Header="币种选择" Margin="10" Grid.Row="1" Grid.Column="0">
+            <TabControl>
+                <!-- 热门币种 -->
+                <TabItem Header="热门">
+                    <ListView x:Name="hotSymbolsListView" ItemsSource="{Binding HotSymbols}" 
+                              ScrollViewer.VerticalScrollBarVisibility="Auto" 
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="排名" DisplayMemberBinding="{Binding Rank}" Width="60"/>
+                                <GridViewColumn Header="币种" DisplayMemberBinding="{Binding Symbol}" Width="80"/>
+                                <GridViewColumn Header="价格" DisplayMemberBinding="{Binding Price}" Width="100"/>
+                                <GridViewColumn Header="涨幅" DisplayMemberBinding="{Binding Change}" Width="80"/>
+                                <GridViewColumn Header="24h 交易量" DisplayMemberBinding="{Binding TradingVolume24h}" Width="150"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </TabItem>
+
+                <!-- 涨幅榜 -->
+                <TabItem Header="涨幅">
+                    <ListView x:Name="gainersSymbolsListView" ItemsSource="{Binding GainersSymbols}" 
+                              ScrollViewer.VerticalScrollBarVisibility="Auto" 
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="排名" DisplayMemberBinding="{Binding Rank}" Width="60"/>
+                                <GridViewColumn Header="币种" DisplayMemberBinding="{Binding Symbol}" Width="80"/>
+                                <GridViewColumn Header="价格" DisplayMemberBinding="{Binding Price}" Width="100"/>
+                                <GridViewColumn Header="涨幅" DisplayMemberBinding="{Binding Change}" Width="80"/>
+                                <GridViewColumn Header="24h 交易量" DisplayMemberBinding="{Binding TradingVolume24h}" Width="150"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </TabItem>
+
+                <!-- 跌幅榜 -->
+                <TabItem Header="跌幅">
+                    <ListView x:Name="losersSymbolsListView" ItemsSource="{Binding LosersSymbols}" 
+                              ScrollViewer.VerticalScrollBarVisibility="Auto" 
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="排名" DisplayMemberBinding="{Binding Rank}" Width="60"/>
+                                <GridViewColumn Header="币种" DisplayMemberBinding="{Binding Symbol}" Width="80"/>
+                                <GridViewColumn Header="价格" DisplayMemberBinding="{Binding Price}" Width="100"/>
+                                <GridViewColumn Header="跌幅" DisplayMemberBinding="{Binding Change}" Width="80"/>
+                                <GridViewColumn Header="24h 交易量" DisplayMemberBinding="{Binding TradingVolume24h}" Width="150"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </TabItem>
+
+                <!-- 新币种 -->
+                <TabItem Header="新币">
+                    <ListView x:Name="newSymbolsListView" ItemsSource="{Binding NewSymbols}" 
+                              ScrollViewer.VerticalScrollBarVisibility="Auto" 
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="币种" DisplayMemberBinding="{Binding Symbol}" Width="80"/>
+                                <GridViewColumn Header="价格" DisplayMemberBinding="{Binding Price}" Width="100"/>
+                                <GridViewColumn Header="涨幅" DisplayMemberBinding="{Binding Change}" Width="80"/>
+                                <GridViewColumn Header="24h 交易量" DisplayMemberBinding="{Binding TradingVolume24h}" Width="150"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </TabItem>
+
+                <!-- 市值 -->
+                <TabItem Header="市值">
+                    <ListView x:Name="marketCapSymbolsListView" ItemsSource="{Binding MarketCapSymbols}" 
+                              ScrollViewer.VerticalScrollBarVisibility="Auto" 
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="排名" DisplayMemberBinding="{Binding Rank}" Width="60"/>
+                                <GridViewColumn Header="币种" DisplayMemberBinding="{Binding Symbol}" Width="80"/>
+                                <GridViewColumn Header="市值" DisplayMemberBinding="{Binding MarketCap}" Width="150"/>
+                                <GridViewColumn Header="价格" DisplayMemberBinding="{Binding Price}" Width="100"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </TabItem>
+
+                <!-- 24小时交易量 -->
+                <TabItem Header="24小时成交量">
+                    <ListView x:Name="volumeSymbolsListView" ItemsSource="{Binding VolumeSymbols}" 
+                              ScrollViewer.VerticalScrollBarVisibility="Auto" 
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="排名" DisplayMemberBinding="{Binding Rank}" Width="60"/>
+                                <GridViewColumn Header="币种" DisplayMemberBinding="{Binding Symbol}" Width="80"/>
+                                <GridViewColumn Header="24h 交易量" DisplayMemberBinding="{Binding TradingVolume24h}" Width="150"/>
+                                <GridViewColumn Header="价格" DisplayMemberBinding="{Binding Price}" Width="100"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </TabItem>
+            </TabControl>
         </GroupBox>
 
         <!-- 右侧订单追踪部分 -->
         <GroupBox Header="订单状态追踪" Margin="10" Grid.Row="1" Grid.Column="1">
-            <DataGrid x:Name="ordersDataGrid" AutoGenerateColumns="False" IsReadOnly="True" ItemsSource="{Binding Orders}">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="下单时间" Binding="{Binding OrderTime}" Width="*" />
-                    <DataGridTextColumn Header="订单ID" Binding="{Binding OrderId}" Width="*"/>
-                    <DataGridTextColumn Header="交易对" Binding="{Binding Symbol}" Width="*"/>
-                    <DataGridTextColumn Header="方向" Binding="{Binding Side}" Width="*"/>
-                    <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="*"/>
-                    <DataGridTextColumn Header="数量" Binding="{Binding Amount}" Width="*"/>
-                    <DataGridTextColumn Header="成交价格" Binding="{Binding Price}" Width="*"/>
-                </DataGrid.Columns>
-            </DataGrid>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <DataGrid x:Name="ordersDataGrid" AutoGenerateColumns="False" IsReadOnly="True" 
+                          ItemsSource="{Binding Orders}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="下单时间" Binding="{Binding OrderTime}" Width="*"/>
+                        <DataGridTextColumn Header="订单ID" Binding="{Binding OrderId}" Width="*"/>
+                        <DataGridTextColumn Header="交易对" Binding="{Binding Symbol}" Width="*"/>
+                        <DataGridTextColumn Header="方向" Binding="{Binding Side}" Width="*"/>
+                        <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="*"/>
+                        <DataGridTextColumn Header="数量" Binding="{Binding Amount}" Width="*"/>
+                        <DataGridTextColumn Header="成交价格" Binding="{Binding Price}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </ScrollViewer>
         </GroupBox>
 
-        <!-- 下方的日志输出部分 -->
         <GroupBox Header="日志" Margin="10" Grid.Row="2" Grid.ColumnSpan="2">
-            <TextBox x:Name="logTextBox" IsReadOnly="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="Wrap"/>
+            <ListBox x:Name="logListBox" ItemsSource="{Binding LogEntries}" 
+             ScrollViewer.CanContentScroll="True" 
+             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </GroupBox>
+
+
+
+
+
     </Grid>
 </Window>
