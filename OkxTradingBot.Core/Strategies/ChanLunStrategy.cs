@@ -2,137 +2,115 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OkxTradingBot.Core.Strategies
 {
-    // 定义缠论中的分型类型：顶分型、底分型、无分型
     public enum FractalType { Top, Bottom, None }
     public enum Trend { Up, Down, None }
+
     public class ChanLunStrategy
     {
-        // 检测分型的方法，根据蜡烛图数据
-        public FractalType DetectFractal(List<Candle> candles, int index)
+        // 检测分型的方法，考虑5根K线以增加分型的有效性
+        public FractalType DetectFractal(List<Candle> candles)
         {
-            if (index < 1 || index >= candles.Count - 1)
+            if (candles.Count < 5)
                 return FractalType.None;
 
-            var prev = candles[index - 1];
-            var curr = candles[index];
-            var next = candles[index + 1];
+            var prev2 = candles[candles.Count - 3];
+            var prev1 = candles[candles.Count - 2];
+            var curr = candles[candles.Count - 1];
 
-            // 顶分型条件
-            if (prev.High < curr.High && curr.High > next.High)
+            // 顶分型条件：当前蜡烛高点大于前两根的高点
+            if (prev2.High < prev1.High && prev1.High < curr.High)
                 return FractalType.Top;
 
-            // 底分型条件
-            if (prev.Low > curr.Low && curr.Low < next.Low)
+            // 底分型条件：当前蜡烛低点低于前两根的低点
+            if (prev2.Low > prev1.Low && prev1.Low > curr.Low)
                 return FractalType.Bottom;
 
             return FractalType.None;
         }
 
-        // 判断当前趋势：上升趋势、下降趋势或无趋势
-        public Trend DetermineTrend(List<Candle> candles)
-        {
-            Trend currentTrend = Trend.None;
-            for (int i = 1; i < candles.Count - 1; i++)
-            {
-                var fractal = DetectFractal(candles, i);
-
-                if (fractal == FractalType.Bottom)
-                {
-                    currentTrend = Trend.Up; // 出现底分型，进入上升趋势
-                }
-                else if (fractal == FractalType.Top)
-                {
-                    currentTrend = Trend.Down; // 出现顶分型，进入下降趋势
-                }
-            }
-            return currentTrend;
-        }
-
-        // 检测是否进入中枢区域
+        // 中枢检测逻辑，基于最近 5 至 10 根蜡烛的高低点
         public class PivotZone
         {
             public decimal UpperBound { get; set; }
             public decimal LowerBound { get; set; }
 
+            // 判断价格是否在中枢区域内
             public bool IsWithinPivot(decimal price)
             {
                 return price >= LowerBound && price <= UpperBound;
             }
         }
 
-        public PivotZone DetectPivot(List<Candle> candles)
+        public PivotZone DetectPivot(List<Candle> candles, int period = 10)
         {
             var pivotZone = new PivotZone();
-            pivotZone.UpperBound = candles.Take(3).Max(c => c.High);
-            pivotZone.LowerBound = candles.Take(3).Min(c => c.Low);
+            pivotZone.UpperBound = candles.Take(period).Max(c => c.High);
+            pivotZone.LowerBound = candles.Take(period).Min(c => c.Low);
             return pivotZone;
         }
 
-        // 检测背驰，根据MACD或其他指标判断背驰
-        public bool CheckForDivergence(List<Candle> candles, List<decimal> macdValues, int index)
+        // 判断趋势方向
+        public Trend DetermineTrend(List<Candle> candles)
         {
-            if (index < 1 || index >= macdValues.Count - 1)
+            // 简单以价格的高低点变化来判断趋势
+            var latestCandle = candles.Last();
+            var previousCandle = candles[candles.Count - 2];
+
+            if (latestCandle.Close > previousCandle.Close)
+                return Trend.Up;
+            if (latestCandle.Close < previousCandle.Close)
+                return Trend.Down;
+
+            return Trend.None;
+        }
+
+        // 背驰检测，可以引入多个指标，如MACD、RSI
+        public bool CheckForDivergence(List<Candle> candles, List<decimal> macdValues)
+        {
+            if (candles.Count < 2 || macdValues.Count < 2)
                 return false;
 
-            // 顶背驰：价格创新高，但MACD没有创新高
-            if (candles[index].High > candles[index - 1].High && macdValues[index] < macdValues[index - 1])
+            var latestCandle = candles.Last();
+            var previousCandle = candles[candles.Count - 2];
+
+            // 顶背驰：价格创新高，但MACD未创新高
+            if (latestCandle.High > previousCandle.High && macdValues.Last() < macdValues[macdValues.Count - 2])
                 return true;
 
-            // 底背驰：价格创新低，但MACD没有创新低
-            if (candles[index].Low < candles[index - 1].Low && macdValues[index] > macdValues[index - 1])
+            // 底背驰：价格创新低，但MACD未创新低
+            if (latestCandle.Low < previousCandle.Low && macdValues.Last() > macdValues[macdValues.Count - 2])
                 return true;
 
             return false;
         }
 
-        // 生成交易信号，基于趋势、分型和背驰判断买卖
+        // 基于缠论的多信号生成交易信号
         public string GenerateSignal(List<Candle> candles, List<decimal> macdValues)
         {
-            for (int i = 1; i < candles.Count - 1; i++)
-            {
-                var fractal = DetectFractal(candles, i);
-                var trend = DetermineTrend(candles);
+            // 获取当前趋势
+            var trend = DetermineTrend(candles);
 
-                if (trend == Trend.Up && fractal == FractalType.Top && CheckForDivergence(candles, macdValues, i))
-                {
-                    return "Sell"; // 在上升趋势中出现顶背驰，生成卖出信号
-                }
+            // 检测当前分型
+            var fractal = DetectFractal(candles);
 
-                if (trend == Trend.Down && fractal == FractalType.Bottom && CheckForDivergence(candles, macdValues, i))
-                {
-                    return "Buy"; // 在下降趋势中出现底背驰，生成买入信号
-                }
-            }
-            return "Hold"; // 无操作信号
-        }
+            // 检测背驰
+            bool divergence = CheckForDivergence(candles, macdValues);
 
-        public static async Task<IEnumerable<CandidateSymbolData>> AnalyzeSymbolsAsync(IEnumerable<CryptoHotData> symbols)
-        {
-            var result = symbols.Select(symbol =>
-            {
+            // 判断中枢区域
+            var pivot = DetectPivot(candles);
+            bool inPivotZone = pivot.IsWithinPivot(candles.Last().Close);
 
-                bool isValid1 = decimal.TryParse(symbol.Change.TrimEnd('%'), out decimal changePercent);
-                bool isValid2 = decimal.TryParse(symbol.Volume.Split(' ')[0].Replace(",", ""), out decimal volume); // 去掉千分符
-                bool isValid = isValid1 && isValid2;
+            // 交易逻辑
+            if (trend == Trend.Up && fractal == FractalType.Top && divergence && !inPivotZone)
+                return "Sell"; // 卖出信号
 
-                // 根据条件判断
-                bool meetsCriteria = isValid && changePercent > 2 && volume > 500;
+            if (trend == Trend.Down && fractal == FractalType.Bottom && divergence && !inPivotZone)
+                return "Buy"; // 买入信号
 
-                return new CandidateSymbolData
-                {
-                    Symbol = symbol.Symbol,
-                    Change = symbol.Change,
-                    Volume = symbol.TradingVolume24h,
-                    MeetsCriteria = meetsCriteria // 可以添加一个字段来指示是否满足条件
-                };
-            });
-
-            return result;
+            return "Hold"; // 无操作
         }
     }
 
@@ -144,14 +122,4 @@ namespace OkxTradingBot.Core.Strategies
         public decimal Close { get; set; }
         public DateTime Time { get; set; }
     }
-
-    public class CandidateSymbolData
-    {
-        public string Symbol { get; set; }
-        public string Change { get; set; }
-        public string Volume { get; set; }
-
-        public bool MeetsCriteria { get; set; }
-    }
-
 }

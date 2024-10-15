@@ -1,6 +1,7 @@
 ﻿using HtmlAgilityPack;
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -8,7 +9,19 @@ namespace OkxTradingBot.Core.Api
 {
     public class CryptoDataFetcher
     {
+
         private static readonly HttpClient client = new HttpClient();
+
+        static CryptoDataFetcher()
+        {
+            var handler = new HttpClientHandler
+            {
+                CookieContainer = new CookieContainer() // 初始化 CookieContainer
+            };
+
+            client = new HttpClient(handler);
+        }
+
 
         public async Task<List<CryptoHotData>> FetchHotCryptoDataAsync()
         {

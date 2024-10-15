@@ -6,6 +6,7 @@ using OkxTradingBot.Core.Utils;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -131,7 +132,7 @@ namespace OkxTradingBot.UI.ViewModel
             // 初始化定时器
             _priceTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromSeconds(30) // 每隔 30 秒获取一次价格
+                Interval = TimeSpan.FromMinutes(5) // 每隔 30 秒获取一次价格
             };
             _priceTimer.Tick += async (s, e) =>
             {
@@ -205,46 +206,20 @@ namespace OkxTradingBot.UI.ViewModel
 
         public async Task MonitorOHLCVForAllSymbols(string interval)
         {
-            // 遍历热门币种列表
-            foreach (var symbolData in HotSymbols)
-            {
-                await MonitorOHLCVData(symbolData.Symbol, interval);
-            }
+            // 合并所有币种列表并提取 Symbol
+            var allSymbols = HotSymbols.Select(symbolData => symbolData.Symbol)
+                .Concat(GainersSymbols.Select(symbolData => symbolData.Symbol))
+                .Concat(LosersSymbols.Select(symbolData => symbolData.Symbol))
+                .Concat(NewSymbols.Select(symbolData => symbolData.Symbol))
+                .Concat(MarketCapSymbols.Select(symbolData => symbolData.Symbol))
+                .Concat(VolumeSymbols.Select(symbolData => symbolData.Symbol))
+                .Concat(TrendingSymbols.Select(symbolData => symbolData.Symbol))
+                .Distinct(); // 去重
 
-            // 遍历涨幅榜列表
-            foreach (var symbolData in GainersSymbols)
+            // 遍历去重后的币种列表
+            foreach (var symbol in allSymbols)
             {
-                await MonitorOHLCVData(symbolData.Symbol, interval);
-            }
-
-            // 遍历跌幅榜列表
-            foreach (var symbolData in LosersSymbols)
-            {
-                await MonitorOHLCVData(symbolData.Symbol, interval);
-            }
-
-            // 遍历新币种列表
-            foreach (var symbolData in NewSymbols)
-            {
-                await MonitorOHLCVData(symbolData.Symbol, interval);
-            }
-
-            // 遍历市场市值列表
-            foreach (var symbolData in MarketCapSymbols)
-            {
-                await MonitorOHLCVData(symbolData.Symbol, interval);
-            }
-
-            // 遍历24小时交易量列表
-            foreach (var symbolData in VolumeSymbols)
-            {
-                await MonitorOHLCVData(symbolData.Symbol, interval);
-            }
-
-            // 遍历趋势币种列表
-            foreach (var symbolData in TrendingSymbols)
-            {
-                await MonitorOHLCVData(symbolData.Symbol, interval);
+                await MonitorOHLCVData(symbol, interval);
             }
         }
 
@@ -262,17 +237,41 @@ namespace OkxTradingBot.UI.ViewModel
             var closingPrices = candles.Select(c => c.Close).ToList();
             var strategy = new ChanLunStrategy();
             var macdResults = _apiClient.CalculateMACD(closingPrices);
-            var lastMacdResult = macdResults.Last();
-            var previousMacdResult = macdResults[^2];
 
-            string signal = strategy.GenerateSignal(candles, new List<decimal> { lastMacdResult.MACDLine, previousMacdResult.MACDLine });
+            // 提取MACD值
+            var macdValues = macdResults.Select(m => m.MACDLine).ToList();
+
+            // 只获取最新蜡烛
+            var latestCandle = candles.Last();
+            var latestMacdValue = macdValues.Last();
+
+            // 生成信号，仅基于最新蜡烛和历史计算的指标
+            string signal = strategy.GenerateSignal(candles, macdValues);
 
             // 设置 TradeSignal 属性
-            TradeSignal = $"{symbol}：生成的交易信号: {signal}";
+
+            if (signal != "Hold")
+            {
+                try
+                {
+                    CurrentPrice = await _apiClient.GetPriceAsync(symbol);
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.MessageBox.Show($"获取价格时出错: {ex.Message}");
+                }
+
+                TradeSignal = $"{symbol}：方向: {signal} 价格：{CurrentPrice}";
+            }
+            else
+            {
+                TradeSignal = $"{symbol}：方向: {signal}";
+            }
 
             // 更新日志
             UpdateLog(TradeSignal);
         }
+
 
         // 加载交易对的方法
         private async Task LoadSymbols()

@@ -34,6 +34,7 @@ namespace OkxTradingBot
             viewModel.LogEntries.CollectionChanged += LogListBox_CollectionChanged; // 绑定事件
         }
 
+
         private void SendScreenshotButton_Click(object sender, RoutedEventArgs e)
         {
             // 调用发送截图的方法
@@ -45,23 +46,41 @@ namespace OkxTradingBot
             ScreenshotHelper.SendText("测试Text9527ABCD#$/");
         }
 
-        private void ViewModel_TradeSignalChanged(object sender, string signal)
+        private async void ViewModel_TradeSignalChanged(object sender, string signal)
         {
-            // 判断信号类型并执行相应的方法
-            // Hold
-            if (signal.Contains("Buy"))
+            // 获取 ViewModel 实例
+            var viewModel = sender as MainWindowViewModel;
+            if (viewModel != null)
             {
-                // 执行买入逻辑
-                ScreenshotHelper.SendText("生成买入信号");
-                ScreenshotHelper.SendScreenshot(this);
-            }
-            else if (signal.Contains("Sell"))
-            {
-                // 执行卖出逻辑
-                ScreenshotHelper.SendText("生成卖出信号");
-                ScreenshotHelper.SendScreenshot(this);
+                // 获取当前的 TradeSignal
+                string currentSignal = viewModel.TradeSignal;
+
+                // 判断信号类型并执行相应的方法
+                if (currentSignal.Contains("Buy"))
+                {
+                    // 执行买入逻辑
+                    ScreenshotHelper.SendText($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} { currentSignal}");
+
+                    // 等待1秒
+                    await Task.Delay(1000); // 1000毫秒 = 1秒
+
+                    // 截图并发送
+                    //ScreenshotHelper.SendScreenshot(this);
+                }
+                else if (currentSignal.Contains("Sell"))
+                {
+                    // 执行卖出逻辑
+                    ScreenshotHelper.SendText($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {currentSignal}");
+
+                    // 等待1秒
+                    await Task.Delay(1000); // 1000毫秒 = 1秒
+
+                    // 截图并发送
+                    //ScreenshotHelper.SendScreenshot(this);
+                }
             }
         }
+
 
         private void LogListBox_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {

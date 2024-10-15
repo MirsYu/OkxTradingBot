@@ -76,7 +76,7 @@ namespace OkxTradingBot
             byte[] screenshotBytes = ScreenshotHelper.CaptureWindowScreenshot(window);
 
             // 找到微信窗口
-            IntPtr wechatWindow = FindWindow(null, "灰眼1307"); // 使用中文标题“微信”
+            IntPtr wechatWindow = FindWindow(null, "灰眼1303"); // 使用中文标题“微信”
             if (wechatWindow == IntPtr.Zero)
             {
                 System.Windows.MessageBox.Show("未找到微信窗口。");
@@ -118,7 +118,7 @@ namespace OkxTradingBot
             string inputText = Text;
 
             // 找到微信窗口
-            IntPtr wechatWindow = ScreenshotHelper.FindWindow(null, "灰眼1307"); // 使用中文标题“微信”
+            IntPtr wechatWindow = ScreenshotHelper.FindWindow(null, "灰眼1303"); // 使用中文标题“微信”
             if (wechatWindow == IntPtr.Zero)
             {
                 System.Windows.MessageBox.Show("未找到微信窗口。");

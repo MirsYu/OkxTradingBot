@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:cef="clr-namespace:CefSharp.Wpf;assembly=CefSharp.Wpf"
         mc:Ignorable="d"
         Title="OKX Trading Bot" Height="1000" Width="1200">
     <Grid>
@@ -186,7 +187,9 @@
         </GroupBox>
 
 
-
+        <!-- 把 ChromiumWebBrowser 放在右侧的第二行 --><!--
+        <cef:ChromiumWebBrowser x:Name="chromiumBrowser" Grid.Row="1" Grid.Column="1" 
+                        Address="https://www.okx.com/zh-hans/markets/explore/hot-crypto"/>-->
 
 
     </Grid>
