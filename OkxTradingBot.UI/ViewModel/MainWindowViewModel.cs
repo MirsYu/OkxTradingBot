@@ -70,7 +70,8 @@ namespace OkxTradingBot.UI.ViewModel
             }
         }
 
-
+        private List<TradeCycle> _pendingBuyTrades = new List<TradeCycle>(); // 存储未完成的买入交易
+        private List<TradeCycle> _completedTrades = new List<TradeCycle>(); // 存储完成的交易闭环
 
         // 新增一个方法来更新日志
         private void UpdateLog(string message)
@@ -270,6 +271,118 @@ namespace OkxTradingBot.UI.ViewModel
 
             // 更新日志
             UpdateLog(TradeSignal);
+
+
+            if (signal == "Buy")
+            {
+                // 买入逻辑
+                CurrentPrice = await _apiClient.GetPriceAsync(symbol);
+                var tradeCycle = new TradeCycle
+                {
+                    BuyPrice = CurrentPrice,
+                    BuyTime = DateTime.Now,
+                    BuyMacdValues = macdValues, // 记录买入时的MACD值
+                    BuyCandlestickValues = closingPrices, // 记录买入时的蜡烛图数据
+                    Symbol = symbol,
+                    IsSuccessful = false // 初始状态
+                };
+
+                // 将新买入记录添加到待处理列表
+                _pendingBuyTrades.Add(tradeCycle);
+            }
+            else if (signal == "Sell")
+            {
+                // 卖出逻辑，检查是否存在待处理的买入记录
+                var matchingTrade = _pendingBuyTrades.FirstOrDefault(t => t.Symbol == symbol && !t.IsSuccessful);
+
+                if (matchingTrade != null)
+                {
+                    // 有匹配的买入记录，可以进行卖出
+                    CurrentPrice = await _apiClient.GetPriceAsync(symbol);
+                    matchingTrade.SellPrice = CurrentPrice;
+                    matchingTrade.SellTime = DateTime.Now;
+                    matchingTrade.SellMacdValues = macdValues; // 记录卖出时的MACD值
+                    matchingTrade.SellCandlestickValues = closingPrices; // 记录卖出时的蜡烛图数据
+                    matchingTrade.IsSuccessful = true;
+
+                    // 计算评分
+                    matchingTrade.CalculateScore();
+
+                    // 将完成的交易闭环添加到已完成列表
+                    _completedTrades.Add(matchingTrade);
+                    _pendingBuyTrades.Remove(matchingTrade); // 从待处理列表中移除
+
+                    // 将交易闭环写入 Excel
+                    var excelExporter = new ExcelExporter();
+                    string filePath = AppDomain.CurrentDomain.BaseDirectory + "file.xlsx"; // 这里指定文件路径
+                    excelExporter.ExportTradeCycleToExcel(matchingTrade, filePath);
+                }
+            }
+
+
+            //string Mode = "full";
+            //if (signal == "Buy")
+            //{
+            //    decimal usdtBalance = await _apiClient.GetBalanceAsync("USDT");
+            //    decimal purchaseAmount;
+            //    // 根据模式进行全仓或三分之一买入
+            //    if (Mode == "full")
+            //    {
+            //        purchaseAmount = usdtBalance / CurrentPrice;  // 全仓买入
+            //    }
+            //    else if (Mode == "third")
+            //    {
+            //        purchaseAmount = (usdtBalance / 3) / CurrentPrice;  // 三分之一买入
+            //    }
+            //    else
+            //    {
+            //        return; // 如果没有匹配的模式，退出
+            //    }
+            //    // 执行买单
+            //    string orderResult = await _apiClient.PlaceBuyOrderAsync(symbol, purchaseAmount);
+            //    Debug.WriteLine($"订单号:{orderResult}");
+            //    string orderState = await _apiClient.GetOrderStatusAsync(symbol, orderResult);
+            //    Debug.WriteLine($"订单状态:{orderState}");
+            //    // 添加订单到 Orders 集合
+            //    Orders.Add(new Core.Orders.Order
+            //    {
+            //        OrderId = orderResult,
+            //        Symbol = symbol,
+            //        Side = "买单",
+            //        Status = orderState,
+            //        Amount = purchaseAmount,
+            //        Price = CurrentPrice,
+            //        OrderTime = DateTime.Now // 当前时间
+            //    });
+            //}
+            //else if (signal == "Sell")
+            //{
+            //    decimal btcBalance = await _apiClient.GetBalanceAsync(symbol);
+            //    if (btcBalance > 0)
+            //    {
+            //        string sellOrderResult = await _apiClient.PlaceSellOrderAsync(symbol, btcBalance);
+            //        Debug.WriteLine($"订单号:{sellOrderResult}");
+
+            //        string sellOrderState = await _apiClient.GetOrderStatusAsync(symbol, sellOrderResult);
+            //        Debug.WriteLine($"订单状态:{sellOrderState}");
+
+            //        // 获取成交价格
+            //        decimal sellPrice = CurrentPrice; // 根据实际逻辑获取价格
+
+            //        // 将订单信息添加到 Orders 集合中
+            //        Orders.Add(new Core.Orders.Order
+            //        {
+            //            OrderId = sellOrderResult,
+            //            Symbol = symbol,
+            //            Side = "卖单",
+            //            Status = sellOrderState,
+            //            Amount = btcBalance,
+            //            Price = sellPrice,
+            //            OrderTime = DateTime.Now // 当前时间
+
+            //        });
+            //    }
+            //}
         }
 
 
@@ -415,4 +528,50 @@ namespace OkxTradingBot.UI.ViewModel
         protected virtual void OnPropertyChanged(string propertyName) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
+
+    public class TradeCycle
+    {
+        public decimal BuyPrice { get; set; }
+        public decimal SellPrice { get; set; }
+        public DateTime BuyTime { get; set; }
+        public DateTime SellTime { get; set; }
+
+        public List<Decimal> BuyMacdValues { get; set; } // 交易过程中买入时的MACD值
+        public List<Decimal> SellMacdValues { get; set; } // 交易过程中卖出时的MACD值
+
+        public List<Decimal> BuyCandlestickValues { get; set; } // 交易过程中买入时的蜡烛图数据
+        public List<Decimal> SellCandlestickValues { get; set; } // 交易过程中卖出时的蜡烛图数据
+
+        public string Symbol { get; set; } // 交易对
+        public bool IsSuccessful { get; set; } // 是否成功完成交易
+
+        public double Score { get; set; } // 评分
+
+        // 计算评分的逻辑
+        public void CalculateScore()
+        {
+            if (IsSuccessful)
+            {
+                // 计算盈利百分比
+                decimal profitPercentage = (SellPrice - BuyPrice) / BuyPrice * 100;
+
+                // 计算买卖之间的时间差（以分钟为单位）
+                double timeDifferenceInMinutes = (SellTime - BuyTime).TotalMinutes;
+
+                // 基于盈利和时间差计算评分
+                // 例如：假设盈利部分和时间部分各占评分的 50%
+                // 时间差越小，分数越高（时间差较大的话，盈利需要更高才能得高分）
+                double profitScore = (double)profitPercentage; // 1% 盈利等于 1 分
+                double timeScore = 100 / (timeDifferenceInMinutes + 1); // 时间越短得分越高，加 1 防止除以 0
+
+                // 综合评分：可以调整权重
+                Score = (profitScore * 0.7) + (timeScore * 0.3);
+            }
+            else
+            {
+                Score = 0; // 如果交易未成功，则得分为 0
+            }
+        }
+    }
+
 }
