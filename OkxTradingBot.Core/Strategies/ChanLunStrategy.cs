@@ -11,6 +11,28 @@ namespace OkxTradingBot.Core.Strategies
     public class ChanLunStrategy
     {
         // 检测分型的方法，考虑5根K线以增加分型的有效性
+        //public FractalType DetectFractal(List<Candle> candles)
+        //{
+        //    if (candles.Count < 5)
+        //        return FractalType.None;
+
+        //    var prev3 = candles[candles.Count - 5];
+        //    var prev2 = candles[candles.Count - 4];
+        //    var prev1 = candles[candles.Count - 3];
+        //    var curr = candles[candles.Count - 2];
+        //    var next = candles[candles.Count - 1];
+
+        //    // 顶分型条件：当前蜡烛中间三根高点依次上升，且后面一根的高点开始下降
+        //    if (prev3.High < prev2.High && prev2.High < prev1.High && prev1.High > curr.High && curr.High > next.High)
+        //        return FractalType.Top;
+
+        //    // 底分型条件：当前蜡烛中间三根低点依次下降，且后面一根的低点开始上升
+        //    if (prev3.Low > prev2.Low && prev2.Low > prev1.Low && prev1.Low < curr.Low && curr.Low < next.Low)
+        //        return FractalType.Bottom;
+
+        //    return FractalType.None;
+        //}
+
         public FractalType DetectFractal(List<Candle> candles)
         {
             if (candles.Count < 5)

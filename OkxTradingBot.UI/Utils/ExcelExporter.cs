@@ -1,6 +1,7 @@
 ﻿using ccxt;
 using ClosedXML.Excel;
 using OkxTradingBot.UI.ViewModel;
+using System.IO;
 
 namespace OkxTradingBot.Core.Utils
 {
@@ -29,30 +30,49 @@ namespace OkxTradingBot.Core.Utils
 
         public void ExportTradeCycleToExcel(TradeCycle trade, string filePath)
         {
-            using var workbook = new XLWorkbook();
-            var worksheet = workbook.Worksheets.Add("Trade Cycles");
+            // Load existing workbook or create a new one
+            using var workbook = new FileInfo(filePath).Exists ? new XLWorkbook(filePath) : new XLWorkbook();
+            var worksheet = workbook.Worksheets.FirstOrDefault() ?? workbook.Worksheets.Add("Trade Cycles");
 
-            // 设置表头
-            worksheet.Cell(1, 1).Value = "Buy Price";
-            worksheet.Cell(1, 2).Value = "Sell Price";
-            worksheet.Cell(1, 3).Value = "Buy Time";
-            worksheet.Cell(1, 4).Value = "Sell Time";
-            worksheet.Cell(1, 5).Value = "Symbol";
-            worksheet.Cell(1, 6).Value = "Score";
+            // Find the last row with data
+            int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 1;
 
-            // 设置 MACD 和 蜡烛图数据表头
-            int currentColumn = 7;
-            for (int i = 0; i < 5; i++)
+            // Declare currentColumn outside of the if block
+            int currentColumn;
+
+            // Set headers if this is a new sheet
+            if (lastRow == 1)
             {
-                worksheet.Cell(1, currentColumn++).Value = $"Buy MACD {i + 1}";
-                worksheet.Cell(1, currentColumn++).Value = $"Sell MACD {i + 1}";
-                worksheet.Cell(1, currentColumn++).Value = $"Buy Candle {i + 1}";
-                worksheet.Cell(1, currentColumn++).Value = $"Sell Candle {i + 1}";
+                worksheet.Cell(1, 1).Value = "Buy Price";
+                worksheet.Cell(1, 2).Value = "Sell Price";
+                worksheet.Cell(1, 3).Value = "Buy Time";
+                worksheet.Cell(1, 4).Value = "Sell Time";
+                worksheet.Cell(1, 5).Value = "Symbol";
+                worksheet.Cell(1, 6).Value = "Score";
+
+                currentColumn = 7; // Initialize currentColumn here
+                for (int i = 0; i < 5; i++)
+                {
+                    worksheet.Cell(1, currentColumn++).Value = $"Buy MACD Line {i + 1}";
+                    worksheet.Cell(1, currentColumn++).Value = $"Sell MACD Line {i + 1}";
+                    worksheet.Cell(1, currentColumn++).Value = $"Buy Candle Open {i + 1}";
+                    worksheet.Cell(1, currentColumn++).Value = $"Buy Candle High {i + 1}";
+                    worksheet.Cell(1, currentColumn++).Value = $"Buy Candle Low {i + 1}";
+                    worksheet.Cell(1, currentColumn++).Value = $"Buy Candle Close {i + 1}";
+                    worksheet.Cell(1, currentColumn++).Value = $"Sell Candle Open {i + 1}";
+                    worksheet.Cell(1, currentColumn++).Value = $"Sell Candle High {i + 1}";
+                    worksheet.Cell(1, currentColumn++).Value = $"Sell Candle Low {i + 1}";
+                    worksheet.Cell(1, currentColumn++).Value = $"Sell Candle Close {i + 1}";
+                }
+            }
+            else
+            {
+                currentColumn = 1; // Initialize for appending data
             }
 
-            // 填充交易数据
-            int row = 2;
-            currentColumn = 1;
+            // Fill trade data in the next row
+            int row = lastRow + 1;
+            currentColumn = 1; // Reset for the new row
             worksheet.Cell(row, currentColumn++).Value = trade.BuyPrice;
             worksheet.Cell(row, currentColumn++).Value = trade.SellPrice;
             worksheet.Cell(row, currentColumn++).Value = trade.BuyTime;
@@ -60,16 +80,69 @@ namespace OkxTradingBot.Core.Utils
             worksheet.Cell(row, currentColumn++).Value = trade.Symbol;
             worksheet.Cell(row, currentColumn++).Value = trade.Score;
 
-            // 填充 MACD 和 蜡烛图数据
+            // Fill MACD and candlestick data
             for (int i = 0; i < 5; i++)
             {
-                worksheet.Cell(row, currentColumn++).Value = i < trade.BuyMacdValues.Count ? trade.BuyMacdValues[i] : 0;
-                worksheet.Cell(row, currentColumn++).Value = i < trade.SellMacdValues.Count ? trade.SellMacdValues[i] : 0;
-                worksheet.Cell(row, currentColumn++).Value = i < trade.BuyCandlestickValues.Count ? trade.BuyCandlestickValues[i] : 0;
-                worksheet.Cell(row, currentColumn++).Value = i < trade.SellCandlestickValues.Count ? trade.SellCandlestickValues[i] : 0;
+                // Write MACD values
+                if (i < trade.BuyMacdValues.Count)
+                {
+                    worksheet.Cell(row, currentColumn++).Value = trade.BuyMacdValues[i].MACDLine;
+                }
+                else
+                {
+                    worksheet.Cell(row, currentColumn++).Value = 0; // Default value if not available
+                }
+
+                if (i < trade.SellMacdValues.Count)
+                {
+                    worksheet.Cell(row, currentColumn++).Value = trade.SellMacdValues[i].MACDLine;
+                }
+                else
+                {
+                    worksheet.Cell(row, currentColumn++).Value = 0; // Default value if not available
+                }
+
+                // Write Buy Candle data
+                if (i < trade.BuyCandlestickValues.Count)
+                {
+                    var buyCandle = trade.BuyCandlestickValues[i];
+                    worksheet.Cell(row, currentColumn++).Value = buyCandle.Open;
+                    worksheet.Cell(row, currentColumn++).Value = buyCandle.High;
+                    worksheet.Cell(row, currentColumn++).Value = buyCandle.Low;
+                    worksheet.Cell(row, currentColumn++).Value = buyCandle.Close;
+                }
+                else
+                {
+                    // Default values for Buy Candle if not available
+                    worksheet.Cell(row, currentColumn++).Value = 0;
+                    worksheet.Cell(row, currentColumn++).Value = 0;
+                    worksheet.Cell(row, currentColumn++).Value = 0;
+                    worksheet.Cell(row, currentColumn++).Value = 0;
+                }
+
+                // Write Sell Candle data
+                if (i < trade.SellCandlestickValues.Count)
+                {
+                    var sellCandle = trade.SellCandlestickValues[i];
+                    worksheet.Cell(row, currentColumn++).Value = sellCandle.Open;
+                    worksheet.Cell(row, currentColumn++).Value = sellCandle.High;
+                    worksheet.Cell(row, currentColumn++).Value = sellCandle.Low;
+                    worksheet.Cell(row, currentColumn++).Value = sellCandle.Close;
+                }
+                else
+                {
+                    // Default values for Sell Candle if not available
+                    worksheet.Cell(row, currentColumn++).Value = 0;
+                    worksheet.Cell(row, currentColumn++).Value = 0;
+                    worksheet.Cell(row, currentColumn++).Value = 0;
+                    worksheet.Cell(row, currentColumn++).Value = 0;
+                }
             }
 
             workbook.SaveAs(filePath);
         }
+
+
+
     }
 }

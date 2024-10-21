@@ -35,7 +35,7 @@ namespace OkxTradingBot.Core.Api
                 document.LoadHtml(response);
 
                 var rows = document.DocumentNode.SelectNodes("//tr");
-
+                if (rows == null) return null;
                 foreach (var row in rows)
                 {
                     var cells = row.SelectNodes(".//td");
@@ -103,7 +103,7 @@ namespace OkxTradingBot.Core.Api
 
 
                 var rows = document.DocumentNode.SelectNodes("//tr");
-
+                if (rows == null) return null;
                 foreach (var row in rows)
                 {
                     var cells = row.SelectNodes(".//td");
@@ -172,7 +172,7 @@ namespace OkxTradingBot.Core.Api
 
                 // 使用 XPath 选择所有包含市场数据的行
                 var rows = document.DocumentNode.SelectNodes("//tr");
-
+                if (rows == null) return null;
                 foreach (var row in rows)
                 {
                     var cells = row.SelectNodes(".//td");
@@ -239,8 +239,9 @@ namespace OkxTradingBot.Core.Api
                 document.LoadHtml(response);
 
                 var rows = document.DocumentNode.SelectNodes("//tr");
-
-                foreach (var row in rows)
+                if (rows == null) return null;
+                foreach (var row in 
+                    rows)
                 {
                     var cells = row.SelectNodes(".//td");
                     if (cells == null || cells.Count < 7) continue;
@@ -315,7 +316,7 @@ namespace OkxTradingBot.Core.Api
 
                 // 使用 XPath 选择所有包含交易数据的行
                 var rows = document.DocumentNode.SelectNodes("//tr");
-
+                if (rows == null) return null;
                 foreach (var row in rows)
                 {
                     var cells = row.SelectNodes(".//td");
@@ -386,7 +387,7 @@ namespace OkxTradingBot.Core.Api
 
                 // 使用 XPath 选择所有包含市场数据的行
                 var rows = document.DocumentNode.SelectNodes("//tr");
-
+                if (rows == null) return null;
                 foreach (var row in rows)
                 {
                     var cells = row.SelectNodes(".//td");
@@ -461,7 +462,7 @@ namespace OkxTradingBot.Core.Api
 
                 // 使用 XPath 选择所有包含市场数据的行
                 var rows = document.DocumentNode.SelectNodes("//tr");
-
+                if (rows == null) return null;
                 foreach (var row in rows)
                 {
                     var cells = row.SelectNodes(".//td");
