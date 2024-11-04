@@ -567,7 +567,7 @@ namespace OkxTradingBot.UI.ViewModel
                 }
 
                 // 综合评分：可以调整权重
-                Score = (profitScore * 0.85) + (timeScore * 0.15);
+                Score = (profitScore * 1) + (timeScore * 0);
             }
             else
             {
